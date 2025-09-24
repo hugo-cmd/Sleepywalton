@@ -5,6 +5,9 @@ import '../services/services.dart';
 import '../widgets/alarm_card.dart';
 import 'set_alarm_screen.dart';
 import 'nfc_management_screen.dart';
+import 'insights_screen.dart';
+import 'alarm_trigger_screen.dart';
+import 'onboarding_screen.dart';
 
 class AlarmListScreen extends ConsumerStatefulWidget {
   const AlarmListScreen({super.key});
@@ -26,9 +29,10 @@ class _AlarmListScreenState extends ConsumerState<AlarmListScreen> {
           IconButton(
             icon: const Icon(Icons.analytics_outlined),
             onPressed: () {
-              // TODO: Navigate to insights dashboard
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Insights coming soon!')),
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const InsightsScreen(),
+                ),
               );
             },
           ),
@@ -41,6 +45,25 @@ class _AlarmListScreenState extends ConsumerState<AlarmListScreen> {
                 ),
               );
             },
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'reset') {
+                _resetApp();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'reset',
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh, size: 20),
+                    SizedBox(width: 8),
+                    Text('Reset App'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -89,9 +112,24 @@ class _AlarmListScreenState extends ConsumerState<AlarmListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addAlarm,
-        child: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          // Test alarm trigger button (for development)
+          FloatingActionButton(
+            heroTag: "test_alarm",
+            onPressed: _testAlarmTrigger,
+            backgroundColor: Colors.orange,
+            child: const Icon(Icons.alarm),
+          ),
+          const SizedBox(height: 16),
+          // Add alarm button
+          FloatingActionButton(
+            heroTag: "add_alarm",
+            onPressed: _addAlarm,
+            child: const Icon(Icons.add),
+          ),
+        ],
       ),
     );
   }
@@ -146,6 +184,89 @@ class _AlarmListScreenState extends ConsumerState<AlarmListScreen> {
         builder: (context) => const SetAlarmScreen(),
       ),
     );
+  }
+
+  void _testAlarmTrigger() {
+    // Create a test alarm for demonstration
+    final testAlarm = Alarm(
+      id: 'test_alarm',
+      name: 'Test Alarm',
+      hour: DateTime.now().hour,
+      minute: DateTime.now().minute,
+      isEnabled: true,
+      repeatDays: [],
+      soundPath: 'default',
+      isVibrationEnabled: true,
+      dismissalMethod: DismissalMethod.standard,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => AlarmTriggerScreen(alarm: testAlarm),
+      ),
+    );
+  }
+
+  Future<void> _resetApp() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset App'),
+        content: const Text(
+          'This will reset the app to the initial setup. All alarms, NFC tags, and sleep data will be lost. Are you sure?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        // Reset authentication
+        await AuthService.resetAuth();
+        
+        // Clear all data
+        final alarms = StorageService.getAllAlarms();
+        for (final alarm in alarms) {
+          await StorageService.deleteAlarm(alarm.id);
+        }
+        
+        final nfcTags = StorageService.getAllNfcTags();
+        for (final tag in nfcTags) {
+          await StorageService.deleteNfcTag(tag.id);
+        }
+        
+        final sleepLogs = StorageService.getAllSleepLogs();
+        for (final log in sleepLogs) {
+          await StorageService.deleteSleepLog(log.id);
+        }
+        
+        // Navigate to onboarding
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => const OnboardingScreen(),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error resetting app: $e')),
+          );
+        }
+      }
+    }
   }
 
   void _editAlarm(Alarm alarm) {

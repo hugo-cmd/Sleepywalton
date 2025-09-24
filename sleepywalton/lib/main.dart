@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'services/services.dart';
-import 'screens/alarm_list_screen.dart';
+import 'screens/screens.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -83,9 +83,56 @@ class SleepyWaltonApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const AlarmListScreen(),
+      home: const AppInitializer(), // Use AppInitializer to check setup status
       debugShowCheckedModeBanner: false,
     );
+  }
+}
+
+class AppInitializer extends ConsumerStatefulWidget {
+  const AppInitializer({super.key});
+
+  @override
+  ConsumerState<AppInitializer> createState() => _AppInitializerState();
+}
+
+class _AppInitializerState extends ConsumerState<AppInitializer> {
+  bool _isLoading = true;
+  bool _isSetupComplete = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSetupStatus();
+  }
+
+  Future<void> _checkSetupStatus() async {
+    try {
+      final isComplete = await AuthService.isSetupComplete();
+      setState(() {
+        _isSetupComplete = isComplete;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error checking setup status: $e');
+      setState(() {
+        _isSetupComplete = false;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    return _isSetupComplete ? const AlarmListScreen() : const OnboardingScreen();
   }
 }
 
@@ -130,60 +177,6 @@ class ErrorApp extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('SleepyWalton'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.alarm,
-              size: 64,
-              color: Colors.green,
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Welcome to SleepyWalton',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Your NFC-powered alarm app',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            SizedBox(height: 32),
-            Text(
-              'App initialized successfully!',
-              style: TextStyle(fontSize: 14, color: Colors.green),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Alarm features coming soon!')),
-          );
-        },
-        child: const Icon(Icons.add),
       ),
     );
   }
